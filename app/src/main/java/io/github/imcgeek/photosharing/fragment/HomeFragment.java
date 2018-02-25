@@ -1,14 +1,36 @@
 package io.github.imcgeek.photosharing.fragment;
 
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ProgressBar;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import io.github.imcgeek.photosharing.HomeActivity;
 import io.github.imcgeek.photosharing.R;
+import io.github.imcgeek.photosharing.adapters.GroupRecyclerAdapter;
+import io.github.imcgeek.photosharing.dataModels.Groups;
 
 
 /**
@@ -30,6 +52,15 @@ public class HomeFragment extends Fragment {
     private String mParam2;
 
     private OnFragmentInteractionListener mListener;
+
+    RecyclerView recyclerView;
+    View view;
+    ProgressDialog progress;
+    GroupRecyclerAdapter adapter;
+    private List<Groups> groupsList = new ArrayList<>();
+
+    FirebaseAuth mAuth;
+    FirebaseUser user;
 
     public HomeFragment() {
         // Required empty public constructor
@@ -56,6 +87,7 @@ public class HomeFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         if (getArguments() != null) {
             mParam1 = getArguments().getString(ARG_PARAM1);
             mParam2 = getArguments().getString(ARG_PARAM2);
@@ -63,10 +95,65 @@ public class HomeFragment extends Fragment {
     }
 
     @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        this.view = view;
+        init();
+        progress = new ProgressDialog(getActivity());
+        progress.setTitle("Loading");
+        progress.setMessage("Syncing");
+        progress.setCancelable(false);
+        progress.show();
+        loadData();
+    }
+
+    private void loadData() {
+        mAuth = FirebaseAuth.getInstance();
+        user = mAuth.getCurrentUser();
+        DatabaseReference db = FirebaseDatabase.getInstance().getReference("groups").child(user.getUid());
+        db.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                groupsList.clear();
+                for (DataSnapshot dataSnapshot1 :dataSnapshot.getChildren()){
+                    Groups value = dataSnapshot1.getValue(Groups.class);
+                    Groups group = new Groups();
+                    String groupId = value.getGroupId();
+                    String groupName = value.getGroupName();
+                    String groupDescription = value.getGroupDescription();
+                    String groupCreatedDate = value.getGroupCreatedDate();
+                    String groupCreatedBy = value.getGroupCreatedBy();
+                    group.setGroupName(groupId);
+                    group.setGroupName(groupName);
+                    group.setGroupDescription(groupDescription);
+                    group.setGroupCreatedDate(groupCreatedDate);
+                    group.setGroupCreatedBy(groupCreatedBy);
+                    groupsList.add(group);
+                }
+                adapter.notifyDataSetChanged();
+                progress.dismiss();
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+    }
+
+    private void init() {
+        recyclerView = (RecyclerView) view.findViewById(R.id.recycleViewGroup);
+        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        adapter = new GroupRecyclerAdapter(getActivity(),groupsList);
+        recyclerView.setAdapter(adapter);
+    }
+
+    @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_home, container, false);
+        View rootView = inflater.inflate(R.layout.fragment_home, container, false);
+        return rootView;
     }
 
     // TODO: Rename method, update argument and hook method into UI event
